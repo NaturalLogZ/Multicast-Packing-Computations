@@ -31,7 +31,7 @@ class PureColGenMcpSolver(MulticastPackingSolver):
                   for i in range(self.instance.num_requests)]) >= self.lamb(x))
             or (all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0 
                      for i in range(self.instance.num_requests)]))
-            or (self.toleranceFunction() <= self.tol) ):
+            or (self.toleranceFunction() <= self.tol/(2+self.tol)) ):
                 self.stop_flag = True
                 # Could have different stop flags for different stopping criteria
     
@@ -42,17 +42,23 @@ class PureColGenMcpSolver(MulticastPackingSolver):
     def generate_fVal(self, x):
         self.fVal[x] = dict()
         for e in self.instance.graph.edges():
-            self.fVal[x][tuple(sorted(e))] = self.lamb(x) + self.reduced_LP.getConstrByName("{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Slack) # Note: Gurobi signs their slacks stupidly
+            self.fVal[x][tuple(sorted(e))] = (
+                self.lamb(x) + self.reduced_LP.getConstrByName(
+                    "{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Slack) 
+                # Note: Gurobi signs their slacks stupidly
+            )
         
     def generate_p(self, x, t=0):
         self.price[(x,t)] = dict()
         for e in self.instance.graph.edges():
-            self.price[(x,t)][tuple(sorted(e))] = self.reduced_LP.getConstrByName("{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Pi)
+            self.price[(x,t)][tuple(sorted(e))] = self.reduced_LP.getConstrByName(
+                "{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Pi)
             
     def generate_q(self, x, t=0):
         self.multicast_costs[(x,t)] = [None] * len(self.instance.requests)
         for i in range(self.instance.num_requests):
-            self.multicast_costs[(x,t)][i] = self.reduced_LP.getConstrByName("Tree Selection for {}".format(i)).getAttr(gp.GRB.Attr.Pi)
+            self.multicast_costs[(x,t)][i] = self.reduced_LP.getConstrByName(
+                "Tree Selection for {}".format(i)).getAttr(gp.GRB.Attr.Pi)
         
 # Helper Functions
 def cost(G, prices):
