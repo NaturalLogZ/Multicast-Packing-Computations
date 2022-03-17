@@ -11,8 +11,8 @@ from MulticastPackingSolver import dict_innerProd
    
 class JansenZhangMinMaxer(MulticastPackingSolver):
     
-    def __init__(self, instance=None, block_solver=None, sigma0=3.6):
-        super().__init__(instance, block_solver)
+    def __init__(self, instance=None, block_approx=2, sigma0=3.6):
+        super().__init__(instance, block_approx)
         self.sigma = mp.mpf(sigma0)
         self.t = self.sigma/6
         self.M = mp.mpf(len(self.instance.graph.edges()))
@@ -22,13 +22,12 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
         self.lambda_of_prev_scaling = 0
         self.w = None
         
-        
     def get_next_solution(self):
-        if self.iteration == 0:
+        if self.iteration == -1:
             x = [dict() for i in range(self.instance.num_requests)]
             step_size = mp.mpf(1)
         else:
-            x = self.solution[self.iteration-1]
+            x = self.solution[self.iteration]
             
             f_prime = dict()
             for e in self.instance.graph.edges():
@@ -39,7 +38,7 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
     
             pf = dict_innerProd(self.p(x, self.t), self.f(x))
             pf_prime = dict_innerProd(self.p(x, self.t), f_prime)
-            step_size = ( (self.t*self.theta(x, self.t)*self.toleranceFunction(1)) 
+            step_size = ( (self.t*self.theta(x, self.t)*self.toleranceFunction()) 
                    /(2*self.M*(pf+pf_prime)) )
 
         
@@ -58,16 +57,21 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
     
     def perform_checks_and_updates(self, x):
         if self.w == None:
-            if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
-                print("Scaling Phase 0 Over")
             self.sigma = self.sigma/2
             self.t = self.sigma/6
             self.w = mp.mpf((1+self.sigma)/((1+self.sigma/3)*self.M))
-            self.new_trees = self.column_generator.generate_new_trees(self.p(x, self.t))
-        elif ( (self.toleranceFunction() <= self.sigma/6) 
-              or (self.lamb(x) <= self.w*self.lambda_of_prev_scaling) ):
+            if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_1:
+                print("Scaling Phase 0 Over")
             if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
-                print("New Scaling Phase")
+                print("sigma = {}".format(self.sigma))
+                print("t = {}".format(self.t))
+                print("w = {}".format(self.w))
+            
+            self.new_trees = self.column_generator.generate_new_trees(self.p(x, self.t))
+        elif (
+                (self.toleranceFunction() <= self.sigma/6) or 
+                (self.lamb(x) <= self.w*self.lambda_of_prev_scaling) 
+        ):
             if self.sigma <= self.tol:
                 self.stop_flag = True
             else:
@@ -76,6 +80,14 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
                 self.t = self.sigma/6
                 self.w = mp.mpf((1+self.sigma)/(1+2*self.sigma))
                 self.new_trees = self.column_generator.generate_new_trees(self.p(x, self.t))
+            if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_1:
+                print("New Scaling Phase")
+            if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
+                print("sigma = {}".format(self.sigma))
+                print("t = {}".format(self.t))
+                print("w = {}".format(self.w))
+            
+             
                 
     
     def generate_lamb(self, x):

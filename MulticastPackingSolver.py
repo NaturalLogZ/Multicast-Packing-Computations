@@ -13,25 +13,10 @@ from MulticastPackingInstance import MulticastPackingInstance
 from Approx2MulticastPackingColumnGenerator import Approx2MulticastPackingColumnGenerator
 from ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
 
-def create_LP(G, multicast_requests):
-    nx.set_edge_attributes(G, 1, "weight")
-    reduced_LP = gp.Model("Multicast Packing Model - Reduced")
-    congestion = reduced_LP.addVar(name="lambda")
-    reduced_LP.setObjective(congestion, gp.GRB.MINIMIZE)
-    reduced_LP.update()
-    # Packing Constraints
-    for e in G.edges():
-        reduced_LP.addConstr(congestion >= 0, name="{} congestion".format(sorted(e)))
-    # Simplex Constraints
-    for i in range(len(multicast_requests)):
-        reduced_LP.addConstr(0*congestion == 1, name="Tree Selection for {}".format(i))
-    reduced_LP.update()
-    return reduced_LP
-
 class MulticastPackingSolver(ABC):
     
     # Constructor
-    def __init__(self, instance=None, block_solver=None):
+    def __init__(self, instance=None, block_approx=2):
         # Attributes related to problem instance
         if instance is None:
             instance = MulticastPackingInstance(NUM_MULTICAST_REQUESTS, MAX_MULTICAST_SIZE)
@@ -39,11 +24,9 @@ class MulticastPackingSolver(ABC):
         self.reduced_LP = create_LP(self.instance.graph, self.instance.requests)
         
         # Attributes related to how this solver generates columns and solutions
-        if block_solver == None:
-            block_solver = Approx2MulticastPackingColumnGenerator(self.instance, self.reduced_LP)
-        if block_solver == "Exact":
+        if block_approx == 1:
             block_solver = ExactMulticastPackingColumnGeneratorIP(self.instance, self.reduced_LP)
-        if block_solver == "2-approx":
+        if block_approx >= 2:
             block_solver = ExactMulticastPackingColumnGeneratorIP(self.instance, self.reduced_LP)
         self.column_generator = block_solver
         
@@ -51,7 +34,7 @@ class MulticastPackingSolver(ABC):
         self.tol = GlobalConstants.TOLERANCE
         self.t = mp.mpf(0)
         self.stop_flag = False
-        self.iteration = 0
+        self.iteration = -1
         self.solution = list()
         self.objVal = dict()
         self.fVal = dict()
@@ -120,8 +103,8 @@ class MulticastPackingSolver(ABC):
     def Phi(self, theta, x, t=0):
         return 
     
-    def toleranceFunction(self, offset=0):
-        x = self.solution[self.iteration-offset]
+    def toleranceFunction(self):
+        x = self.solution[self.iteration]
         f_prime = dict()
         for e in self.instance.graph.edges():
             f_prime[tuple(sorted(e))] = mp.mpf(0)
@@ -137,25 +120,40 @@ class MulticastPackingSolver(ABC):
     def perform_iteration(self):
         t = self.t
         x = self.get_next_solution()
+        self.iteration += 1
         self.solution.append(x)
         self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
         self.perform_checks_and_updates(x)
         
-        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
+        
+        if (
+            (db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and 
+                ( (self.iteration % int(10/(db.DEBUG_LEVEL-1)) == 0) or 
+                  (self.stop_flag)
+                )
+        ):
             print(self.iteration)
             print("lambda(x): {}".format(self.lamb(x)))
             print("phi_t(x): {}".format(self.phi(x,t)))
             print("tolerance: {}".format(self.toleranceFunction()))
         
-        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_1 and (self.iteration % 100 == 0 or self.stop_flag):
-            print(self.iteration)
-            print("lambda(x): {}".format(self.lamb(x)))
-            print("phi_t(x): {}".format(self.phi(x,t)))
-            print("tolerance: {}".format(self.toleranceFunction()))
-            
-        self.iteration += 1
         
 # Helper Functions
 def dict_innerProd(x, y):
     assert x.keys() == y.keys()
     return sum(x[key]*y[key] for key in x.keys())
+
+def create_LP(G, multicast_requests):
+    nx.set_edge_attributes(G, 1, "weight")
+    reduced_LP = gp.Model("Multicast Packing Model - Reduced")
+    congestion = reduced_LP.addVar(name="lambda")
+    reduced_LP.setObjective(congestion, gp.GRB.MINIMIZE)
+    reduced_LP.update()
+    # Packing Constraints
+    for e in G.edges():
+        reduced_LP.addConstr(congestion >= 0, name="{} congestion".format(sorted(e)))
+    # Simplex Constraints
+    for i in range(len(multicast_requests)):
+        reduced_LP.addConstr(0*congestion == 1, name="Tree Selection for {}".format(i))
+    reduced_LP.update()
+    return reduced_LP
