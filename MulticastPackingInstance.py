@@ -10,10 +10,11 @@ import GlobalConstants
 def is_connected(G):
     return nx.is_k_edge_connected(G, 1)
 
-def get_random_connected_graph():
-    G = nx.empty_graph(GlobalConstants.NUM_NODES)
+def get_random_connected_graph(n, m):
+    degree = 2*m // n
+    G = nx.empty_graph()
     while not is_connected(G):
-        G = nx.random_regular_graph(GlobalConstants.DEGREE, GlobalConstants.NUM_NODES)
+        G = nx.random_regular_graph(degree, n)
     return G
 
 class MulticastRequest:
@@ -30,9 +31,12 @@ class MulticastRequest:
         return self.recipients.union([self.source])
 
 class MulticastPackingInstance:
-    def __init__(self, num_requests, max_request_size, graph=None, requests=None):
+    def __init__(self, n=GlobalConstants.NUM_NODES, m=GlobalConstants.NUM_EDGES,
+                 num_requests=GlobalConstants.NUM_MULTICAST_REQUESTS, 
+                 max_request_size=GlobalConstants.MAX_MULTICAST_SIZE, 
+                 graph=None, requests=None):
         if graph is None:
-            graph = get_random_connected_graph()
+            graph = get_random_connected_graph(n, m)
         if requests is None:
             requests = list()
             for i in range(num_requests):

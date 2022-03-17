@@ -11,7 +11,7 @@ from MulticastPackingSolver import dict_innerProd
    
 class JansenZhangMinMaxer(MulticastPackingSolver):
     
-    def __init__(self, instance=None, block_solver=None, sigma0=1):
+    def __init__(self, instance=None, block_solver=None, sigma0=3.6):
         super().__init__(instance, block_solver)
         self.sigma = mp.mpf(sigma0)
         self.t = self.sigma/6
