@@ -12,6 +12,7 @@ import DebugConstants as db
 from MulticastPackingInstance import MulticastPackingInstance
 from Approx2MulticastPackingColumnGenerator import Approx2MulticastPackingColumnGenerator
 from ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
+from ExactMcpWithDelayColumnGenerator import ExactMcpWithDelayColumnGenerator
 
 class MulticastPackingSolver(ABC):
     
@@ -24,10 +25,12 @@ class MulticastPackingSolver(ABC):
         self.reduced_LP = create_LP(self.instance.graph, self.instance.requests)
         
         # Attributes related to how this solver generates columns and solutions
-        if block_approx == 1:
+        if block_approx == "Delay":
+            block_solver = ExactMcpWithDelayColumnGenerator(self.instance, self.reduced_LP)
+        elif block_approx == 1:
             block_solver = ExactMulticastPackingColumnGeneratorIP(self.instance, self.reduced_LP)
-        if block_approx >= 2:
-            block_solver = ExactMulticastPackingColumnGeneratorIP(self.instance, self.reduced_LP)
+        elif block_approx >= 2:
+            block_solver = Approx2MulticastPackingColumnGenerator(self.instance, self.reduced_LP)
         self.column_generator = block_solver
         
         # Attributes that track things
@@ -120,22 +123,22 @@ class MulticastPackingSolver(ABC):
     def perform_iteration(self):
         t = self.t
         x = self.get_next_solution()
+        self.iteration += 1
+        self.solution.append(x)
+        self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
+        self.perform_checks_and_updates(x)
         
         if (
-            (db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and 
-                ( (self.iteration % int(10/(db.DEBUG_LEVEL-1)) == 0) or 
-                  (self.stop_flag)
-                )
+            (db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and
+            (
+                (self.iteration % round(10/(db.DEBUG_LEVEL-1)) == 0) or 
+                (self.stop_flag)
+            )
         ):
             print(self.iteration)
             print("lambda(x): {}".format(self.lamb(x)))
             print("phi_t(x): {}".format(self.phi(x,t)))
             print("tolerance: {}".format(self.toleranceFunction()))
-            
-        self.iteration += 1
-        self.solution.append(x)
-        self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
-        self.perform_checks_and_updates(x)
         
         
 # Helper Functions

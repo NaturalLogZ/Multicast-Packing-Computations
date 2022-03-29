@@ -33,16 +33,22 @@ class MulticastRequest:
 class MulticastPackingInstance:
     def __init__(self, n=GlobalConstants.NUM_NODES, m=GlobalConstants.NUM_EDGES,
                  num_requests=GlobalConstants.NUM_MULTICAST_REQUESTS, 
-                 max_request_size=GlobalConstants.MAX_MULTICAST_SIZE, 
-                 graph=None, requests=None):
+                 max_request_size=GlobalConstants.MAX_MULTICAST_SIZE,
+                 delay=GlobalConstants.DELAY,
+                 graph=None, 
+                 requests=None
+                ):
         if graph is None:
             graph = get_random_connected_graph(n, m)
+            for u,v in graph.edges():
+                graph[u][v]['delay'] = round(random.triangular(0, delay/2, delay*m/(n*n)))
+                print(graph[u][v]['delay'])
         if requests is None:
             requests = list()
             for i in range(num_requests):
-                k = random.randint(2, max_request_size)
-                requests.append(MulticastRequest(k, graph))
+                requests.append(MulticastRequest(max_request_size, graph))
         self.graph = graph
         self.num_edges = len(self.graph.edges())
         self.requests = requests
         self.num_requests = len(requests)
+        self.delay = delay
