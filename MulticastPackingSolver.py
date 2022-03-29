@@ -120,11 +120,6 @@ class MulticastPackingSolver(ABC):
     def perform_iteration(self):
         t = self.t
         x = self.get_next_solution()
-        self.iteration += 1
-        self.solution.append(x)
-        self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
-        self.perform_checks_and_updates(x)
-        
         
         if (
             (db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and 
@@ -136,6 +131,11 @@ class MulticastPackingSolver(ABC):
             print("lambda(x): {}".format(self.lamb(x)))
             print("phi_t(x): {}".format(self.phi(x,t)))
             print("tolerance: {}".format(self.toleranceFunction()))
+            
+        self.iteration += 1
+        self.solution.append(x)
+        self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
+        self.perform_checks_and_updates(x)
         
         
 # Helper Functions

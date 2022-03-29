@@ -8,6 +8,7 @@ class MulticastPackingColumnGenerator(ABC):
     def __init__(self, instance, reduced_LP):
         self.instance = instance
         self.reduced_LP = reduced_LP
+        self.varType = gp.GRB.CONTINUOUS
         self.Gurobi_variables = [dict() for i in range(self.instance.num_requests)]
         
     @abstractmethod
@@ -36,7 +37,8 @@ class MulticastPackingColumnGenerator(ABC):
                 "Tree Selection for {}".format(i)))
             self.Gurobi_variables[i][new_tree] = self.reduced_LP.addVar(
                 name="x({}, {})".format(i, nx.info(new_tree)), 
-                column=gp.Column(coeffs, constrs))
+                column=gp.Column(coeffs, constrs),
+                vtype=self.varType)
             self.reduced_LP.update()
             
         return new_trees
