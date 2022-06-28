@@ -10,9 +10,9 @@ import mpmath as mp
 import GlobalConstants
 import DebugConstants as db
 from MulticastPackingInstance import MulticastPackingInstance
-from Approx2MulticastPackingColumnGenerator import Approx2MulticastPackingColumnGenerator
-from ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
-from ExactMcpWithDelayColumnGenerator import ExactMcpWithDelayColumnGenerator
+from ColumnGenerators.Impls.Approx2MulticastPackingColumnGenerator import Approx2MulticastPackingColumnGenerator
+from ColumnGenerators.Impls.ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
+from ColumnGenerators.Impls.ExactMcpWithDelayColumnGenerator import ExactMcpWithDelayColumnGenerator
 
 class MulticastPackingSolver(ABC):
     
@@ -36,7 +36,7 @@ class MulticastPackingSolver(ABC):
         # Attributes that track things
         self.tol = GlobalConstants.TOLERANCE
         self.t = mp.mpf(0)
-        self.stop_flag = False
+        self.stop_flag = 0x0
         self.iteration = -1
         self.solution = list()
         self.objVal = dict()
@@ -124,6 +124,12 @@ class MulticastPackingSolver(ABC):
         t = self.t
         x = self.get_next_solution()
         self.iteration += 1
+        if db.DEBUG_LEVEL > db.DEBUG_LEVEL_FULL:
+            print("Iteration {}: num trees = {}, num Gurobi Vars = {}".format(
+                self.iteration,
+                sum(len(x[i]) for i in range(self.instance.num_requests)),
+                sum(len(self.column_generator.Gurobi_variables[i]) for i in range(self.instance.num_requests)),
+            ))
         self.solution.append(x)
         self.new_trees = self.column_generator.generate_new_trees(self.p(x, t))
         self.perform_checks_and_updates(x)
@@ -160,3 +166,11 @@ def create_LP(G, multicast_requests):
         reduced_LP.addConstr(0*congestion == 1, name="Tree Selection for {}".format(i))
     reduced_LP.update()
     return reduced_LP
+
+# Helper Functions
+def cost(G, prices):
+    original_weights = nx.get_edge_attributes(G, "weight") 
+    nx.set_edge_attributes(G, prices, "weight")
+    retval = sum(nx.get_edge_attributes(G, "weight").values())
+    nx.set_edge_attributes(G, original_weights, "weight")
+    return retval

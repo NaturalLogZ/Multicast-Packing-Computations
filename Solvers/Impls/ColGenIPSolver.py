@@ -3,8 +3,8 @@
 import gurobipy as gp
 import networkx as nx
 
-from PureColGenMcpSolver import PureColGenMcpSolver
-from PureColGenMcpSolver import cost
+from Solvers.Impls.PureColGenMcpSolver import PureColGenMcpSolver, cost
+#from PureColGenMcpSolver import cost
 
 class ColGenIPSolver(PureColGenMcpSolver):
     def __init__(self, instance=None, block_approx=2):
@@ -35,7 +35,7 @@ class ColGenIPSolver(PureColGenMcpSolver):
             else:
                 newPriceDict[e] = 0
         
-        # newPriceDict = {e: newPriceDict[e] / sum(list(newPriceDict.values())) for e in newPriceDict}
+        newPriceDict = {e: newPriceDict[e] / sum(list(newPriceDict.values())) for e in newPriceDict}
         self.price[(x,t)] = newPriceDict
                 
     def generate_q(self, x, t=0):

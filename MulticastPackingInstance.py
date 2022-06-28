@@ -5,6 +5,7 @@ import networkx as nx
 import random
 
 import GlobalConstants
+import DebugConstants as db
 
 
 def is_connected(G):
@@ -42,7 +43,8 @@ class MulticastPackingInstance:
             graph = get_random_connected_graph(n, m)
             for u,v in graph.edges():
                 graph[u][v]['delay'] = round(random.triangular(0, delay/2, delay*m/(n*n)))
-                print(graph[u][v]['delay'])
+                if  db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
+                    print(graph[u][v]['delay'])
         if requests is None:
             requests = list()
             for i in range(num_requests):

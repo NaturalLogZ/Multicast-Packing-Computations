@@ -4,14 +4,15 @@ from math import log
 
 import mpmath as mp
 
+import GlobalConstants
 import DebugConstants as db
 from FrozenDict import FrozenDict
-from MulticastPackingSolver import MulticastPackingSolver
-from MulticastPackingSolver import dict_innerProd
+from Solvers.MulticastPackingSolver import MulticastPackingSolver, cost, dict_innerProd
+#from MulticastPackingSolver import dict_innerProd
    
 class JansenZhangMinMaxer(MulticastPackingSolver):
     
-    def __init__(self, instance=None, block_approx=2, sigma0=3.6):
+    def __init__(self, instance=None, block_approx=2, sigma0=1):
         super().__init__(instance, block_approx)
         self.sigma = mp.mpf(sigma0)
         self.t = self.sigma/6
@@ -48,7 +49,7 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
             for T in x[i]:
                 new_x[i][T] = (1-step_size)*x[i][T]
                 
-            if self.new_trees[i] in new_x[i]:
+            if self.new_trees[i] in x[i]:
                 new_x[i][self.new_trees[i]] += step_size
             else:
                 new_x[i][self.new_trees[i]] = step_size
@@ -60,6 +61,7 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
             self.sigma = self.sigma/2
             self.t = self.sigma/6
             self.w = mp.mpf((1+self.sigma)/((1+self.sigma/3)*self.M))
+            self.lambda_of_prev_scaling = self.lamb(x)
             if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_1:
                 print("Scaling Phase 0 Over")
             if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
@@ -73,7 +75,7 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
                 (self.lamb(x) <= self.w*self.lambda_of_prev_scaling) 
         ):
             if self.sigma <= self.tol:
-                self.stop_flag = True
+                self.stop_flag |= GlobalConstants.STOP_FLAG_TOL_MET
             else:
                 self.lambda_of_prev_scaling= self.lamb(x)
                 self.sigma = self.sigma/2
@@ -87,7 +89,17 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
                 print("t = {}".format(self.t))
                 print("w = {}".format(self.w))
             
-             
+        t = self.t
+        if sum([cost(self.new_trees[i], self.p(x,t)) 
+                for i in range(self.instance.num_requests)]) >= self.lamb(x):
+            self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
+            
+        if all([cost(self.new_trees[i], self.p(x,t)) - self.q(x,t)[i] >= 0 
+                for i in range(self.instance.num_requests)]):
+            self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
+        
+        if self.iteration >= GlobalConstants.MAX_ITERS:
+            self.stop_flag |= GlobalConstants.STOP_FLAG_MAXITER
                 
     
     def generate_lamb(self, x):
@@ -106,13 +118,9 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
             self.price[(x,t)][tuple(sorted(e))] = t*self.theta(x,t)/(self.M*(self.theta(x,t) 
                                                                               - self.f(x)[tuple(sorted(e))]))
     
-    # THIS ISN'T NEEDED BY THIS ALGO. I WOULD LIKE TO ADD THIS FUNCTION BUT CURRENTLY THIS WON'T WORK
-    def generate_q(self, x, t=0):
-        return
-        self.multicast_costs[(x,t)] = [None] * len(self.instance.requests)
-        for i in range(self.instance.num_requests):
-            self.multicast_costs[(x,t)][i] = self.reduced_LP.getConstrByName(
-                "Tree Selection for {}".format(i)).getAttr(gp.GRB.Attr.Pi)
+    # THIS ISN'T NEEDED BY THIS ALGO. BUT I AM USING TO IMPROVE RUNTIME. THIS q CANNOT BE INTERPRETED AS ONE WOULD IF USING SIMPLEX
+    def generate_q(self, x, t):
+        self.multicast_costs[(x,t)] = [self.lamb(x) / self.instance.num_requests] * len(self.instance.requests)
             
     def generate_theta(self, x, t):
         if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:

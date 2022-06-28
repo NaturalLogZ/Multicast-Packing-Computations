@@ -3,7 +3,7 @@
 import gurobipy as gp
 import networkx as nx
 from networkx.algorithms.approximation.steinertree import steiner_tree as steiner_tree_2
-from MulticastPackingColumnGenerator import MulticastPackingColumnGenerator
+from ColumnGenerators.MulticastPackingColumnGenerator import MulticastPackingColumnGenerator
 
 class ExactMulticastPackingColumnGeneratorIP(MulticastPackingColumnGenerator):
     def __init__(self, instance, reduced_LP):
@@ -73,6 +73,11 @@ class ExactMulticastPackingColumnGeneratorIP(MulticastPackingColumnGenerator):
         model.setObjective(sum(c[e]*x[e] for e in x), gp.GRB.MINIMIZE)
         model.update()
         model.optimize()
+        status = model.getAttr(gp.GRB.Attr.Status)
+        if status != gp.GRB.OPTIMAL:
+            print("Column Gen Error")
+            print("{} exited with code {}".format(model, status))
+            return self.instance.graph.edge_subgraph()
         
         steinerTree = list()
         for e in self.instance.graph.edges():

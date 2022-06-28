@@ -3,8 +3,9 @@
 import gurobipy as gp
 import networkx as nx
 
+import GlobalConstants
 from FrozenDict import FrozenDict
-from MulticastPackingSolver import MulticastPackingSolver
+from Solvers.MulticastPackingSolver import MulticastPackingSolver, cost
 
 class PureColGenMcpSolver(MulticastPackingSolver):
     def get_next_solution(self):
@@ -23,17 +24,31 @@ class PureColGenMcpSolver(MulticastPackingSolver):
         self.generate_p(x)
         self.generate_q(x)
         
+        
+        print(self.lamb(x))
+        print(self.reduced_LP.ObjVal)
+        for e in self.instance.graph.edges():
+            e = tuple(sorted(e))
+            if self.p(x)[e] > 0.001:
+                print("p_{} = {}".format(e, self.p(x)[e]))
+        print("")
+        
         return x
     
     def perform_checks_and_updates(self, x):
-        if ( 
-            (sum([cost(self.new_trees[i], self.p(x)) 
-                  for i in range(self.instance.num_requests)]) >= self.lamb(x))
-            or (all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0 
-                     for i in range(self.instance.num_requests)]))
-            or (self.toleranceFunction() <= self.tol/(2+self.tol)) ):
-                self.stop_flag = True
-                # Could have different stop flags for different stopping criteria
+        if sum([cost(self.new_trees[i], self.p(x)) 
+                for i in range(self.instance.num_requests)]) >= self.lamb(x):
+            self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
+            
+        if all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0 
+                for i in range(self.instance.num_requests)]):
+            self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
+            
+        if self.toleranceFunction() <= self.tol/(2+self.tol):
+            self.stop_flag |= GlobalConstants.STOP_FLAG_TOL_MET
+                
+        if self.iteration >= GlobalConstants.MAX_ITERS:
+            self.stop_flag |= GlobalConstants.STOP_FLAG_MAXITER
     
     def generate_lamb(self, x):
         self.objVal[x] = self.reduced_LP.getObjective().getValue()
@@ -50,20 +65,18 @@ class PureColGenMcpSolver(MulticastPackingSolver):
         
     def generate_p(self, x, t=0):
         self.price[(x,t)] = dict()
+        
+        
+        
         for e in self.instance.graph.edges():
-            self.price[(x,t)][tuple(sorted(e))] = self.reduced_LP.getConstrByName(
-                "{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Pi)
+            self.price[(x,t)][tuple(sorted(e))] = max(
+                self.reduced_LP.getConstrByName(
+                "{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Pi),
+                0
+            ) # Dual sometimes small negative value due to numerical issues. Round these up to 0
             
     def generate_q(self, x, t=0):
         self.multicast_costs[(x,t)] = [None] * len(self.instance.requests)
         for i in range(self.instance.num_requests):
             self.multicast_costs[(x,t)][i] = self.reduced_LP.getConstrByName(
                 "Tree Selection for {}".format(i)).getAttr(gp.GRB.Attr.Pi)
-        
-# Helper Functions
-def cost(G, prices):
-    original_weights = nx.get_edge_attributes(G, "weight") 
-    nx.set_edge_attributes(G, prices, "weight")
-    retval = sum(nx.get_edge_attributes(G, "weight").values())
-    nx.set_edge_attributes(G, original_weights, "weight")
-    return retval

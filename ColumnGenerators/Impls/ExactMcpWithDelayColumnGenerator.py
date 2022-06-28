@@ -2,7 +2,7 @@
 
 import gurobipy as gp
 import networkx as nx
-from ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
+from ColumnGenerators.Impls.ExactMulticastPackingColumnGeneratorIP import ExactMulticastPackingColumnGeneratorIP
 
 class ExactMcpWithDelayColumnGenerator(ExactMulticastPackingColumnGeneratorIP):
     def __init__(self, instance, reduced_LP):
