@@ -26,7 +26,9 @@ class ColGenIPSolver(PureColGenMcpSolver):
 #                 print(self.column_generator.Gurobi_variables[i][T])
         
             
-    def generate_p(self, x, t=0):
+    def generate_p(self, x, t=None):
+        if not t:
+            t = self.t
         newPriceDict = dict()
         for edge in self.instance.graph.edges():
             e = tuple(sorted(edge))
@@ -38,7 +40,9 @@ class ColGenIPSolver(PureColGenMcpSolver):
         newPriceDict = {e: newPriceDict[e] / sum(list(newPriceDict.values())) for e in newPriceDict}
         self.price[(x,t)] = newPriceDict
                 
-    def generate_q(self, x, t=0):
+    def generate_q(self, x, t=None):
+        if not t:
+            t = self.t
         newCostDict = [self.instance.num_edges] * len(self.instance.requests)
         prices = self.p(x)
         for i in range(self.instance.num_requests):

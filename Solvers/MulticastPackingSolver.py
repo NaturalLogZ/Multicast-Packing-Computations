@@ -35,7 +35,7 @@ class MulticastPackingSolver(ABC):
         
         # Attributes that track things
         self.tol = GlobalConstants.TOLERANCE
-        self.t = mp.mpf(0)
+        self.t = None
         self.stop_flag = 0x0
         self.iteration = -1
         self.solution = list()
@@ -87,23 +87,27 @@ class MulticastPackingSolver(ABC):
             self.generate_fVal(x)
         return self.fVal[x]
     
-    def p(self, x, t=0):
+    def p(self, x, t=None):
+        if not t:
+            t = self.t
         if (x,t) not in self.price:
             self.generate_p(x,t)
         return self.price[(x,t)]
     
-    def q(self, x, t=0):
+    def q(self, x, t=None):
+        if not t:
+            t = self.t
         if (x,t) not in self.multicast_costs:
             self.generate_q(x,t)
         return self.multicast_costs[(x,t)]
     
-    def theta(self, x, t=0):
+    def theta(self, x, t=None):
         return self.lamb(x)
     
-    def phi(self, x, t=0):
+    def phi(self, x, t=None):
         return log(self.lamb(x))
     
-    def Phi(self, theta, x, t=0):
+    def Phi(self, theta, x, t=None):
         return 
     
     def toleranceFunction(self):
@@ -118,6 +122,22 @@ class MulticastPackingSolver(ABC):
         pf = dict_innerProd(self.p(x, self.t), self.f(x))
         pf_prime = dict_innerProd(self.p(x, self.t), f_prime)
         return (pf-pf_prime)/(pf+pf_prime)
+    
+    # Method for printing debug info
+    def print_info(self, x, t):
+        print(self.iteration)
+        print("{:05b}".format(self.stop_flag))
+        print("lambda(x): {}".format(self.lamb(x)))
+        print("phi_t(x): {}".format(self.phi(x,t)))
+        print("tolerance: {}".format(self.toleranceFunction()))
+        for e in self.instance.graph.edges():
+            e = tuple(sorted(e))
+            if self.p(x)[e] > 0.001:
+                print("p_{} = {}".format(e, self.p(x)[e]))
+        for i in range(self.instance.num_requests):
+            print("ReducedCost_{} = {}".format(i,
+            cost(self.new_trees[i], self.p(x)) - self.q(x)[i]))
+        print("")
     
     # Main Function
     def perform_iteration(self):
@@ -135,16 +155,11 @@ class MulticastPackingSolver(ABC):
         self.perform_checks_and_updates(x)
         
         if (
-            (db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and
-            (
-                (self.iteration % round(10/(db.DEBUG_LEVEL-1)) == 0) or 
-                (self.stop_flag)
-            )
+            ((db.DEBUG_LEVEL > db.DEBUG_LEVEL_THEORY_0) and
+             (self.iteration % round(1/(db.DEBUG_LEVEL-1)) == 0)) or 
+            ((db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0) and (self.stop_flag))
         ):
-            print(self.iteration)
-            print("lambda(x): {}".format(self.lamb(x)))
-            print("phi_t(x): {}".format(self.phi(x,t)))
-            print("tolerance: {}".format(self.toleranceFunction()))
+            self.print_info(x, t)
         
         
 # Helper Functions

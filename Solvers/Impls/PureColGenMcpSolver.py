@@ -8,6 +8,8 @@ from FrozenDict import FrozenDict
 from Solvers.MulticastPackingSolver import MulticastPackingSolver, cost
 
 class PureColGenMcpSolver(MulticastPackingSolver):
+    def __init__(self, instance=None, block_approx=2):
+        super().__init__(instance, block_approx)
     def get_next_solution(self):
         self.reduced_LP.optimize()
         x = [dict() for i in range(self.instance.num_requests)]
@@ -24,15 +26,6 @@ class PureColGenMcpSolver(MulticastPackingSolver):
         self.generate_p(x)
         self.generate_q(x)
         
-        
-        print(self.lamb(x))
-        print(self.reduced_LP.ObjVal)
-        for e in self.instance.graph.edges():
-            e = tuple(sorted(e))
-            if self.p(x)[e] > 0.001:
-                print("p_{} = {}".format(e, self.p(x)[e]))
-        print("")
-        
         return x
     
     def perform_checks_and_updates(self, x):
@@ -40,7 +33,7 @@ class PureColGenMcpSolver(MulticastPackingSolver):
                 for i in range(self.instance.num_requests)]) >= self.lamb(x):
             self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
             
-        if all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0 
+        if all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0
                 for i in range(self.instance.num_requests)]):
             self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
             
@@ -63,19 +56,21 @@ class PureColGenMcpSolver(MulticastPackingSolver):
                 # Note: Gurobi signs their slacks stupidly
             )
         
-    def generate_p(self, x, t=0):
+    def generate_p(self, x, t=None):
+        if not t:
+            t = self.t
         self.price[(x,t)] = dict()
         
-        
-        
         for e in self.instance.graph.edges():
-            self.price[(x,t)][tuple(sorted(e))] = max(
+            self.price[(x,t)][tuple(sorted(e))] = max( # Dual sometimes small negative value due to numerical issues. Round these up to 0
                 self.reduced_LP.getConstrByName(
                 "{} congestion".format(sorted(e))).getAttr(gp.GRB.Attr.Pi),
                 0
-            ) # Dual sometimes small negative value due to numerical issues. Round these up to 0
+            )
             
-    def generate_q(self, x, t=0):
+    def generate_q(self, x, t=None):
+        if not t:
+            t = self.t
         self.multicast_costs[(x,t)] = [None] * len(self.instance.requests)
         for i in range(self.instance.num_requests):
             self.multicast_costs[(x,t)][i] = self.reduced_LP.getConstrByName(
