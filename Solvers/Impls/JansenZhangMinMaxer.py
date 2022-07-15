@@ -57,6 +57,15 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
         return tuple(new_x)
     
     def perform_checks_and_updates(self, x):
+        t = self.t
+        if sum([cost(self.new_trees[i], self.p(x,t)) 
+                for i in range(self.instance.num_requests)]) >= self.lamb(x):
+            self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
+            
+        if all([cost(self.new_trees[i], self.p(x,t)) - self.q(x,t)[i] >= self.tol
+                for i in range(self.instance.num_requests)]):
+            self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
+        
         if self.w == None:
             self.sigma = self.sigma/2
             self.t = self.sigma/6
@@ -89,15 +98,6 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
                 print("t = {}".format(self.t))
                 print("w = {}".format(self.w))
             
-        t = self.t
-        if sum([cost(self.new_trees[i], self.p(x,t)) 
-                for i in range(self.instance.num_requests)]) >= self.lamb(x):
-            self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
-            
-        if all([cost(self.new_trees[i], self.p(x,t)) - self.q(x,t)[i] >= 0 
-                for i in range(self.instance.num_requests)]):
-            self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
-        
         if self.iteration >= GlobalConstants.MAX_ITERS:
             self.stop_flag |= GlobalConstants.STOP_FLAG_MAXITER
                 
@@ -117,52 +117,21 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
         for e in self.instance.graph.edges():
             self.price[(x,t)][tuple(sorted(e))] = t*self.theta(x,t)/(self.M*(self.theta(x,t) 
                                                                               - self.f(x)[tuple(sorted(e))]))
-    
-    # THIS ISN'T NEEDED BY THIS ALGO. BUT I AM USING TO IMPROVE RUNTIME. THIS q CANNOT BE INTERPRETED AS ONE WOULD IF USING SIMPLEX
-    def generate_q(self, x, t):
-        self.multicast_costs[(x,t)] = [self.lamb(x) / self.instance.num_requests] * len(self.instance.requests)
-            
+
+    def generate_q(self, x, t=None):
+        if not t:
+            t = self.t
+        
+        self.multicast_costs[(x,t)] = [
+            min(cost(T, self.p(x, t)) for T in x[i].keys()) 
+                for i in range(self.instance.num_requests)]
+        
     def generate_theta(self, x, t):
-        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
-            #print(t)
-            #print(x)
-            #print(self.lamb(x))
-            #print(self.f(x))
-            print("lambda: {} \t t: {} \t M: {}".format(type(self.lamb(x)), type(t), type(self.M)))
-            print("Result: {}".format(type(self.lamb(x)/(1-t/self.M))))
-            print(self.lamb(x)/(1-t/self.M))
-            #print(theta_eq(self.lamb(x)/(1-t/self.M), t, self.M, self.f(x)))
-            print(self.lamb(x)/(1-t))
-            #print(theta_eq(self.lamb(x)/(1-t), t, self.M, self.f(x)))
-        #self.theta_dict[(x,t)] = scipy.optimize.brentq(
-        #    theta_eq, self.lamb(x)/(1-t/self.M), self.lamb(x)/(1-t), args=(t, self.M, self.f(x)))
         self.theta_dict[(x,t)] = (
             mp.findroot(lambda theta: theta_eq(theta, t, self.M, self.f(x)),
                         (mp.mpf(self.lamb(x)/(1-t/self.M)), mp.mpf(self.lamb(x)/(1-t))), 
                         solver='ridder')
         )
-        
-        
-        #self.theta_dict[(x,t)] = scipy.optimize.newton(
-        #     theta_eq, self.lamb(x)/(1-t), derivative_theta_eq, args=(t, self.M, self.f(x)))
-        
-    # THE FOLLOWING IS DEPRECATED AND WILL CAUSE ERRORS
-    # Define a function that computes theta_t(x)
-    #def theta_via_sympy(self, x, t):
-    #    M = self.M
-    #    f = self.f
-    #    
-    #    theta = sympy.Symbol('theta')
-    #    expression = 1
-    #    for m in constraint_indices:
-    #        expression -= (t/M) * theta/(theta - f(x,m))
-    #    soln_set = sympy.solvers.solveset(expression, theta, domain=sympy.Interval(self.lamb[x], sympy.S.Infinity, True, True))
-    #    #assert len(soln_set == 1)
-    #    if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
-    #        print(soln_set)
-    #    for soln in soln_set:
-    #        retval = soln
-    #    return retval
             
     def generate_phi(self, x, t):
         theta = self.theta(x,t)
@@ -187,7 +156,7 @@ class JansenZhangMinMaxer(MulticastPackingSolver):
 def theta_eq(theta, t, M, f):
     retval = mp.mpf(0)
     
-    if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
+    if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_EXTREME:
         print("retval: {}".format(type(retval)))
         print("theta: {}: {}".format(type(theta), theta))
     
