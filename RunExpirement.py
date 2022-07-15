@@ -9,6 +9,7 @@ import DebugConstants as db
 from MulticastPackingInstance import MulticastPackingInstance
 from Solvers.Impls.PureColGenMcpSolver import PureColGenMcpSolver
 from Solvers.Impls.JansenZhangMinMaxer import JansenZhangMinMaxer
+from Solvers.Impls.PerturbedColGenMcpSolver import PerturbedColGenMcpSolver
 from Solvers.Impls.ColGenIPSolver import ColGenIPSolver
 
 
@@ -17,7 +18,7 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
     tableRows2 = list()
     solverList = list()
     
-    for n,m,k,s,d in paramList:
+    for label,n,m,k,s,d in paramList:
         if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0:
             print("Parameter Loop: |V|={}, |E|={}, k={}, |S_i|<={}, D = {}".format(n,m,k,s,d))
             
@@ -51,44 +52,51 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
                         solver = PureColGenMcpSolver(instance=instance, block_approx=apx)
                     elif solver_id == GlobalConstants.JZ2008_ID:
                         solver = JansenZhangMinMaxer(instance=instance, block_approx=apx)
+                    elif solver_id == GlobalConstants.PERTCG_ID:
+                        solver = PerturbedColGenMcpSolver(instance=instance, block_approx=apx)
                     elif solver_id == GlobalConstants.FULLIP_ID:
                         solver = ColGenIPSolver(instance=instance, block_approx=apx)
 
                     if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0:
                         print("\t\t Algo: {} \t Block Approx: {}".format(solver_id, apx))
-                    timer = list()
-                    total_time = 0
-                    while(not solver.stop_flag):
-                        prev_time = time.perf_counter()
-                        solver.perform_iteration()
-                        new_time = time.perf_counter()
-                        timer.append(new_time - prev_time)
-                        total_time += new_time - prev_time
-                        if total_time > GlobalConstants.MAX_TIME:
-                            solver.stop_flag |= GlobalConstants.STOP_FLAG_TIMEOUT
+                    try:
+                        timer = list()
+                        total_time = 0
+                        while(not solver.stop_flag):
+                            prev_time = time.perf_counter()
+                            solver.perform_iteration()
+                            new_time = time.perf_counter()
+                            timer.append(new_time - prev_time)
+                            total_time += new_time - prev_time
+                            if total_time > GlobalConstants.MAX_TIME:
+                                solver.stop_flag |= GlobalConstants.STOP_FLAG_TIMEOUT
 
-                    x = solver.solution[solver.iteration]
-                    totalIter[apx, solver_id].append(solver.iteration)
-                    secsPerIt[apx, solver_id].append(mean(timer))
-                    totalSecs[apx, solver_id].append(sum(timer))
-                    FinObjVal[apx, solver_id].append(solver.lamb(x))
-                    FinPotVal[apx, solver_id].append(solver.phi(x, solver.t))
-                    StopFlags[apx, solver_id] |= solver.stop_flag
+                        x = solver.solution[solver.iteration]
+                        totalIter[apx, solver_id].append(solver.iteration)
+                        secsPerIt[apx, solver_id].append(mean(timer))
+                        totalSecs[apx, solver_id].append(sum(timer))
+                        FinObjVal[apx, solver_id].append(solver.lamb(x))
+                        FinPotVal[apx, solver_id].append(solver.phi(x, solver.t))
+                        StopFlags[apx, solver_id] |= solver.stop_flag
 
-                    newRow = [
-                        solver_id, apx,
-                        n,m,k,s,d,
-                        solver.lamb(x),
-                        solver.phi(x, solver.t),
-                        solver.iteration,
-                        sum(timer),
-                        mean(timer),
-                        bin(32+solver.stop_flag)
-                    ]
-                    solverList.append(solver)
-                    with open("outputs/{}.csv".format(datetime_str),'a') as allFile:
-                        allWriter = csv.writer(allFile)
-                        allWriter.writerow(newRow)
+                        newRow = [
+                            label,
+                            solver_id, apx,
+                            n,m,k,s,d,
+                            solver.lamb(x),
+                            solver.phi(x, solver.t),
+                            solver.iteration,
+                            sum(timer),
+                            mean(timer),
+                            "{:05b}".format(solver.stop_flag)
+                        ]
+                        solverList.append(solver)
+                        with open("outputs/{}.csv".format(datetime_str),'a') as allFile:
+                            allWriter = csv.writer(allFile)
+                            allWriter.writerow(newRow)
+                        
+                    except Exception as e:
+                        print(repr(e))
 
         for apx in approxLevels:
             for solver_id in solverTypes:
@@ -97,13 +105,13 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
                 avgtotalSecs = mean(totalSecs[apx, solver_id])
                 avgFinObjVal = mean(FinObjVal[apx, solver_id])
                 avgFinPotVal = mean(FinPotVal[apx, solver_id])
-                newRow = [solver_id, apx, n, m, k, s, d,
+                newRow = [label, solver_id, apx, n, m, k, s, d,
                           avgFinObjVal, avgFinPotVal, avgTotalIter, 
                           avgtotalSecs, avgSecsPerIt, 
-                          bin(32+StopFlags[apx, solver_id])]
+                          "{:05b}".format(StopFlags[apx, solver_id])]
 
 
-    with open("outputs/summary_{}.csv".format(datetime_str),'a') as sumFile:
+    with open("outputs/summaries/summary_{}.csv".format(datetime_str),'a') as sumFile:
         sumWriter = csv.writer(sumFile)
         sumWriter.writerow(newRow)
         
