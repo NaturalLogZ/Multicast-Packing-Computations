@@ -11,12 +11,11 @@ from Solvers.Impls.PureColGenMcpSolver import PureColGenMcpSolver
 from Solvers.Impls.JansenZhangMinMaxer import JansenZhangMinMaxer
 from Solvers.Impls.PerturbedColGenMcpSolver import PerturbedColGenMcpSolver
 from Solvers.Impls.ColGenIPSolver import ColGenIPSolver
+from Solvers.Impls.WarmStartColGenMcpSolver import WarmStartColGenMcpSolver
 
-
-def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
-    tableRows = list()
-    tableRows2 = list()
-    solverList = list()
+def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes, solverList):
+    #tableRows = list()
+    #tableRows2 = list()
     
     for label,n,m,k,s,d in paramList:
         if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0:
@@ -56,6 +55,8 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
                         solver = PerturbedColGenMcpSolver(instance=instance, block_approx=apx)
                     elif solver_id == GlobalConstants.FULLIP_ID:
                         solver = ColGenIPSolver(instance=instance, block_approx=apx)
+                    elif solver_id == GlobalConstants.WARMST_ID:
+                        solver = WarmStartColGenMcpSolver(instance=instance, block_approx=apx)
 
                     if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0:
                         print("\t\t Algo: {} \t Block Approx: {}".format(solver_id, apx))
@@ -98,21 +99,22 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes):
                     except Exception as e:
                         print(repr(e))
 
-        for apx in approxLevels:
-            for solver_id in solverTypes:
-                avgTotalIter = mean(totalIter[apx, solver_id])
-                avgSecsPerIt = mean(secsPerIt[apx, solver_id])
-                avgtotalSecs = mean(totalSecs[apx, solver_id])
-                avgFinObjVal = mean(FinObjVal[apx, solver_id])
-                avgFinPotVal = mean(FinPotVal[apx, solver_id])
-                newRow = [label, solver_id, apx, n, m, k, s, d,
-                          avgFinObjVal, avgFinPotVal, avgTotalIter, 
-                          avgtotalSecs, avgSecsPerIt, 
-                          "{:05b}".format(StopFlags[apx, solver_id])]
+#         for apx in approxLevels:
+#             for solver_id in solverTypes:
+#                 try:
+#                     avgTotalIter = mean(totalIter[apx, solver_id])
+#                     avgSecsPerIt = mean(secsPerIt[apx, solver_id])
+#                     avgtotalSecs = mean(totalSecs[apx, solver_id])
+#                     avgFinObjVal = mean(FinObjVal[apx, solver_id])
+#                     avgFinPotVal = mean(FinPotVal[apx, solver_id])
+#                     newRow = [label, solver_id, apx, n, m, k, s, d,
+#                           avgFinObjVal, avgFinPotVal, avgTotalIter, 
+#                           avgtotalSecs, avgSecsPerIt, 
+#                           "{:05b}".format(StopFlags[apx, solver_id])]
 
 
-    with open("outputs/summaries/summary_{}.csv".format(datetime_str),'a') as sumFile:
-        sumWriter = csv.writer(sumFile)
-        sumWriter.writerow(newRow)
+#     with open("outputs/summaries/summary_{}.csv".format(datetime_str),'a') as sumFile:
+#         sumWriter = csv.writer(sumFile)
+#         sumWriter.writerow(newRow)
         
     return solverList
