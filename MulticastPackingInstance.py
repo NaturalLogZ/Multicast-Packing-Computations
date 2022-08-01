@@ -50,7 +50,13 @@ class MulticastPackingInstance:
             for i in range(num_requests):
                 requests.append(MulticastRequest(max_request_size, graph))
         self.graph = graph
+        self.pos = nx.kamada_kawai_layout(graph)
         self.num_edges = len(self.graph.edges())
         self.requests = requests
         self.num_requests = len(requests)
         self.delay = delay
+        
+    def print_graph(self):
+        nx.draw(self.graph, self.pos, with_labels=True)
+        for request in self.requests:
+            print(request.multicast_group())

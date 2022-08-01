@@ -6,6 +6,7 @@ from math import log
 import gurobipy as gp
 import networkx as nx
 import mpmath as mp
+import matplotlib.pyplot as plt
 
 import GlobalConstants
 import DebugConstants as db
@@ -36,7 +37,7 @@ class MulticastPackingSolver(ABC):
         # Attributes that track things
         self.tol = GlobalConstants.TOLERANCE
         self.t = None
-        self.stop_flag = 0x0
+        self.stop_flag = 0b0
         self.iteration = -1
         self.solution = list()
         self.objVal = dict()
@@ -48,6 +49,17 @@ class MulticastPackingSolver(ABC):
         if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_EXTREME:
             print(reduced_LP.getA().toarray())
             print(reduced_LP.getAttr("RHS"))
+            
+        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
+            G = self.instance.graph
+            pos = self.instance.pos
+            for i in range(self.instance.num_requests):
+                tree = self.new_trees[i]
+                plt.figure()
+                nx.draw_networkx(G, pos)
+                nx.draw_networkx_edges(G, pos, edgelist=tree.edges(), width=5, edge_color="y", style="dashed")
+                #print(tree.edges())
+            plt.show()
     
     # Abstract methods for generating values of functions needed by the solver
     
@@ -130,13 +142,28 @@ class MulticastPackingSolver(ABC):
         print("lambda(x): {}".format(self.lamb(x)))
         print("phi_t(x): {}".format(self.phi(x,t)))
         print("tolerance: {}".format(self.toleranceFunction()))
-        for e in self.instance.graph.edges():
-            e = tuple(sorted(e))
-            if self.p(x)[e] > 0.001:
-                print("p_{} = {}".format(e, self.p(x)[e]))
-        for i in range(self.instance.num_requests):
-            print("ReducedCost_{} = {}".format(i,
-            cost(self.new_trees[i], self.p(x)) - self.q(x)[i]))
+        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_2:
+            for e in self.instance.graph.edges():
+                e = tuple(sorted(e))
+                if self.p(x)[e] > 0.001:
+                    print("p_{} = {}".format(e, self.p(x)[e]))
+            for i in range(self.instance.num_requests):
+                print("ReducedCost_{} = {}".format(i,
+                cost(self.new_trees[i], self.p(x)) - self.q(x)[i]))
+                print("NewCost_{} = {}".format(i,
+                cost(self.new_trees[i], self.p(x))))
+        if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_FULL:
+            G = self.instance.graph
+            pos = self.instance.pos
+            for i in range(self.instance.num_requests):
+                tree = self.new_trees[i]
+                plt.figure()
+                plt.title("Tree {} for iteration {}".format(i, self.iteration))
+                nx.draw_networkx(G, pos)
+                nx.draw_networkx_edges(G, pos, edgelist=tree.edges(), width=5, edge_color="y", style="dashed")
+                nx.draw_networkx_edge_labels(tree, pos, self.p(x))
+                #print(tree.edges())
+            plt.show()
         print("")
     
     # Main Function

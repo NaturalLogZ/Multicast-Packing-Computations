@@ -29,11 +29,13 @@ class PureColGenMcpSolver(MulticastPackingSolver):
         return x
     
     def perform_checks_and_updates(self, x):
+        # This first check is broken
         if sum([cost(self.new_trees[i], self.p(x)) 
                 for i in range(self.instance.num_requests)]) >= self.lamb(x):
             self.stop_flag |= GlobalConstants.STOP_DUALITYMATCH
             
-        if all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= 0
+        totalNewCost = sum([cost(self.new_trees[i], self.p(x)) for i in range(self.instance.num_requests)])
+        if all([cost(self.new_trees[i], self.p(x)) - self.q(x)[i] >= -self.tol * totalNewCost / self.instance.num_requests
                 for i in range(self.instance.num_requests)]):
             self.stop_flag |= GlobalConstants.STOP_FLAG_REDCOST
             
