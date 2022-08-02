@@ -20,7 +20,7 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes, s
     for label,n,m,k,s,d in paramList:
         if db.DEBUG_LEVEL >= db.DEBUG_LEVEL_THEORY_0:
             print("Parameter Loop: |V|={}, |E|={}, k={}, |S_i|<={}, D = {}".format(n,m,k,s,d))
-            
+        
         totalIter = {(apx, solver_id): list() 
                      for apx in approxLevels
                      for solver_id in solverTypes}
@@ -91,7 +91,7 @@ def runExpirement(datetime_str, numReps, paramList, approxLevels, solverTypes, s
                             mean(timer),
                             "{:05b}".format(solver.stop_flag)
                         ]
-                        solverList.append(solver)
+                        #solverList.append(solver) # I Think this causes the program to use too much RAM
                         with open("outputs/{}.csv".format(datetime_str),'a') as allFile:
                             allWriter = csv.writer(allFile)
                             allWriter.writerow(newRow)
