@@ -1,5 +1,5 @@
 
 .ipynb_checkpoints/
-gurobi.env
 __pycache__/
 outputs/
+GurobiLogs/
